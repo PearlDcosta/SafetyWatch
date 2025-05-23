@@ -62,19 +62,8 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
     try {
       setIsLoading(true);
       await login(values.email, values.password, isAdminLogin);
-      // Fetch user from context after login
-      const authUser = useAuth().user;
       toast.success("Login successful!");
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        // Redirect based on user role
-        if (authUser && authUser.role === "admin") {
-          router.push("/admin/dashboard");
-        } else {
-          router.push("/dashboard");
-        }
-      }
+      router.push("/");
     } catch (error: any) {
       // Only log unexpected errors
       if (
@@ -98,11 +87,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       setIsGoogleLoading(true);
       await signInWithGoogle(isAdminLogin);
       toast.success("Signed in with Google successfully!");
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        router.push(isAdminLogin ? "/admin/dashboard" : "/dashboard");
-      }
+      router.push("/");
     } catch (error) {
       console.error("Google Sign-in error:", error);
       toast.error("Failed to sign in with Google. Please try again.");

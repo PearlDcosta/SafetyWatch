@@ -247,10 +247,16 @@ export async function updateCrimeReportStatus(
 ) {
   try {
     const reportRef = doc(db, "crimeReports", id);
-    await updateDoc(reportRef, {
-      status: status,
-      updatedAt: new Date().toISOString(),
-    });
+    // Fetch the current report to compare status
+    const reportSnap = await getDoc(reportRef);
+    if (!reportSnap.exists()) throw new Error("Report not found");
+    const current = reportSnap.data();
+    // Only update updatedAt if status is changing
+    const update: any = { status };
+    if (!current.status || current.status !== status) {
+      update.updatedAt = new Date().toISOString();
+    }
+    await updateDoc(reportRef, update);
   } catch (error) {
     console.error("Error updating report status:", error);
     throw error;

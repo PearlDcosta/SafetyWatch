@@ -135,7 +135,7 @@ The output MUST be a valid JSON object with the following keys: "TITLE", "DESCRI
 Example JSON output:
 {
   "TITLE": "Vandalism on Park Bench",
-  "DESCRIPTION": "The image shows a park bench that has been spray-painted with graffiti. The incident likely occurred at night.",
+  "DESCRIPTION": "A park bench that has been spray-painted with graffiti. The incident likely occurred at night.",
   "TYPE": "vandalism"
 }
 

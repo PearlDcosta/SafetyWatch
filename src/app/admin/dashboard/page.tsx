@@ -97,11 +97,13 @@ export default function AdminDashboardPage() {
 
     const sorted = [...results].sort((a, b) => {
       let comparison = 0;
-      
       switch (sortField) {
-        case "date":
-          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "date": {
+          const aDate = a.incidentDateTime ? new Date(a.incidentDateTime) : new Date(a.createdAt);
+          const bDate = b.incidentDateTime ? new Date(b.incidentDateTime) : new Date(b.createdAt);
+          comparison = aDate.getTime() - bDate.getTime();
           break;
+        }
         case "type":
           comparison = a.crimeType.localeCompare(b.crimeType);
           break;
@@ -109,7 +111,6 @@ export default function AdminDashboardPage() {
           comparison = a.status.localeCompare(b.status);
           break;
       }
-
       return sortDirection === "asc" ? comparison : -comparison;
     });
 
@@ -264,34 +265,22 @@ export default function AdminDashboardPage() {
                 <Table>
                   <TableHeader className="bg-gray-50">
                     <TableRow>
-                      <TableHead 
-                        className="font-medium cursor-pointer hover:bg-gray-100 transition-colors min-w-[120px]"
-                        onClick={() => handleSort("type")}
-                      >
-                        <div className="flex items-center">
-                          Type
-                          <SortIcon field="type" />
-                        </div>
+                      <TableHead className="font-medium min-w-[100px] max-w-[110px] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => handleSort("type")}> 
+                        <div className="flex items-center">Type<SortIcon field="type" /></div>
                       </TableHead>
                       <TableHead className="font-medium min-w-[180px]">Title</TableHead>
-                      <TableHead className="font-medium min-w-[150px]">Location</TableHead>
-                      <TableHead className="font-medium min-w-[120px]">Tracking ID</TableHead>
+                      <TableHead className="font-medium min-w-[260px]">Location</TableHead>
+                      <TableHead className="font-medium min-w-[110px] max-w-[130px]">Tracking ID</TableHead>
                       {reportFilter === 'authenticated' && (
                         <TableHead className="font-medium min-w-[180px]">Reporter Email</TableHead>
                       )}
-                      <TableHead 
-                        className="font-medium cursor-pointer hover:bg-gray-100 transition-colors min-w-[150px]"
-                        onClick={() => handleSort("date")}
-                      >
+                      <TableHead className="font-medium cursor-pointer hover:bg-gray-100 transition-colors min-w-[180px]" onClick={() => handleSort("date")}> 
                         <div className="flex items-center">
-                          Reported
+                          Date and Time Occurred
                           <SortIcon field="date" />
                         </div>
                       </TableHead>
-                      <TableHead 
-                        className="font-medium cursor-pointer hover:bg-gray-100 transition-colors min-w-[140px]"
-                        onClick={() => handleSort("status")}
-                      >
+                      <TableHead className="font-medium cursor-pointer hover:bg-gray-100 transition-colors min-w-[140px]" onClick={() => handleSort("status")}>
                         <div className="flex items-center">
                           Status
                           <SortIcon field="status" />
@@ -310,7 +299,7 @@ export default function AdminDashboardPage() {
                           transition={{ duration: 0.2 }}
                           className="hover:bg-gray-50 group"
                         >
-                          <TableCell className="capitalize">
+                          <TableCell className="capitalize min-w-[100px] max-w-[110px] truncate">
                             {report.crimeType.toLowerCase()}
                           </TableCell>
                           <TableCell 
@@ -320,12 +309,12 @@ export default function AdminDashboardPage() {
                             {report.title}
                           </TableCell>
                           <TableCell 
-                            className={`max-w-[150px] ${expandedLocations[report.id] ? 'whitespace-normal' : 'truncate'} cursor-pointer`}
+                            className={`max-w-[260px] ${expandedLocations[report.id] ? 'whitespace-normal' : 'truncate'} cursor-pointer`}
                             onClick={() => toggleLocationExpansion(report.id)}
                           >
                             {report.location?.address || 'N/A'}
                           </TableCell>
-                          <TableCell className="font-mono text-sm cursor-pointer truncate max-w-[180px]" onClick={() => toggleLocationExpansion(report.id + '-tracking')}>
+                          <TableCell className="font-mono text-sm cursor-pointer truncate min-w-[110px] max-w-[130px]" onClick={() => toggleLocationExpansion(report.id + '-tracking')}>
                             <span className={expandedLocations[report.id + '-tracking'] ? 'whitespace-normal break-all' : ''}>
                               {report.trackingId || report.id}
                             </span>
@@ -338,13 +327,25 @@ export default function AdminDashboardPage() {
                             </TableCell>
                           )}
                           <TableCell>
-                            {new Date(report.createdAt).toLocaleDateString("en-US", { 
-                              year: 'numeric', 
-                              month: 'short', 
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
+                            {/* Use incidentDateTime if valid, else date/time if valid, else createdAt */}
+                            {(() => {
+                              let dateStr: string | undefined;
+                              let timeStr: string | undefined;
+                              if (report.incidentDateTime && !isNaN(new Date(report.incidentDateTime).getTime())) {
+                                const d = new Date(report.incidentDateTime);
+                                dateStr = d.toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' });
+                                timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                              } else if (report.date && !isNaN(new Date(report.date).getTime())) {
+                                const d = new Date(report.date);
+                                dateStr = d.toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' });
+                                timeStr = report.time;
+                              } else if (report.createdAt && !isNaN(new Date(report.createdAt).getTime())) {
+                                const d = new Date(report.createdAt);
+                                dateStr = d.toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' });
+                                timeStr = undefined;
+                              }
+                              return dateStr ? `${dateStr}${timeStr ? ` at ${timeStr}` : ''}` : <span className="text-gray-400">-</span>;
+                            })()}
                           </TableCell>
                           <TableCell>
                             <Select 
@@ -382,6 +383,16 @@ export default function AdminDashboardPage() {
                               </SelectContent>
                             </Select>
                           </TableCell>
+                          <TableCell>
+                            <button
+                              title="View Details"
+                              onClick={() => router.push(`/reports/${report.id}`)}
+                              className="text-blue-600 hover:text-blue-800 transition-colors"
+                              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                            </button>
+                          </TableCell>
                         </motion.tr>
                       ))}
                     </AnimatePresence>
@@ -417,10 +428,10 @@ export default function AdminDashboardPage() {
                         <TableRow>
                           <TableHead className="font-medium min-w-[120px]">Type</TableHead>
                           <TableHead className="font-medium min-w-[180px]">Title</TableHead>
-                          <TableHead className="font-medium min-w-[150px]">Location</TableHead>
+                          <TableHead className="font-medium min-w-[260px]">Location</TableHead>
                           <TableHead className="font-medium min-w-[120px]">Tracking ID</TableHead>
                           {reportFilter === 'authenticated' && <TableHead className="font-medium min-w-[180px]">Reporter Email</TableHead>}
-                          <TableHead className="font-medium min-w-[150px]">Reported</TableHead>
+                          <TableHead className="font-medium min-w-[150px]">Date and Time Occurred</TableHead>
                           <TableHead className="font-medium min-w-[140px]">Status</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -443,7 +454,7 @@ export default function AdminDashboardPage() {
                               {report.title}
                             </TableCell>
                             <TableCell 
-                              className={`max-w-[150px] ${expandedLocations[report.id] ? 'whitespace-normal' : 'truncate'} cursor-pointer`}
+                              className={`max-w-[260px] ${expandedLocations[report.id] ? 'whitespace-normal' : 'truncate'} cursor-pointer`}
                               onClick={() => toggleLocationExpansion(report.id)}
                             >
                               {report.location?.address || 'N/A'}
@@ -461,13 +472,25 @@ export default function AdminDashboardPage() {
                               </TableCell>
                             )}
                             <TableCell>
-                              {new Date(report.createdAt).toLocaleDateString("en-US", { 
-                                year: 'numeric', 
-                                month: 'short', 
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
+                              {/* Show incidentDateTime if valid, else date if valid, else createdAt, else dash */}
+                              {(() => {
+                                const dateStr = report.incidentDateTime && !isNaN(new Date(report.incidentDateTime).getTime())
+                                  ? report.incidentDateTime
+                                  : report.date && !isNaN(new Date(report.date).getTime())
+                                    ? report.date
+                                    : report.createdAt && !isNaN(new Date(report.createdAt).getTime())
+                                      ? report.createdAt
+                                      : null;
+                                return dateStr
+                                  ? new Date(dateStr).toLocaleString("en-US", {
+                                      year: 'numeric',
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })
+                                  : <span className="text-gray-400">-</span>;
+                              })()}
                             </TableCell>
                             <TableCell>
                               <StatusBadge status={report.status} />

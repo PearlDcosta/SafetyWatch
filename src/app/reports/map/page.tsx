@@ -37,8 +37,10 @@ export default function CrimeMapPage() {
         setIsLoading(true);
         setError(null);
         const allReports = await getPublicCrimeReports();
+        // Only show reports that are verified or resolved
         const validReports = allReports.filter(
           (report) =>
+            (report.status === "verified" || report.status === "resolved") &&
             report.location?.geoPoint?.latitude &&
             report.location?.geoPoint?.longitude
         );

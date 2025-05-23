@@ -93,7 +93,7 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
     }
   }, [isAdmin, loading]);
   if (!loading && isAdmin) {
-    // Render nothing for admins, not even a blank div
+    // Render nothing for admins
     return null;
   }
 
@@ -260,6 +260,8 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
         reporterId: user ? user.uid : null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        // Use user-selected date and time for incidentDateTime
+        incidentDateTime: `${values.date}T${values.time}`,
       };
       if (user && user.displayName) {
         reportData.reporterName = user.displayName;
@@ -283,7 +285,10 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
         address: values.address,
         geoPoint: mapCoordinates ? { latitude: mapCoordinates.lat, longitude: mapCoordinates.lng } : null
       };
-      const created = await createCrimeReport(reportData);
+      // Remove date and time fields from top-level (optional, for clarity)
+      delete reportData.date;
+      delete reportData.time;
+      const created = await createCrimeReport(reportData, selectedImages);
       setIsLoading(false);
       // Show tracking ID to user after submission (even if logged in)
       if (onSuccess) onSuccess(trackingId || created.id);

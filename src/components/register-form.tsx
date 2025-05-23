@@ -78,7 +78,7 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
         isAdminRegister
       );
       toast.success("Registration successful! You are now logged in.");
-      router.push(isAdminRegister ? "/admin/dashboard" : "/dashboard");
+      router.push("/");
       onSuccess?.();
     } catch (error: any) {
       console.error("Registration error:", error);
@@ -93,7 +93,7 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
       setIsGoogleLoading(true);
       await signInWithGoogle(isAdminRegister);
       toast.success("Signed in with Google successfully!");
-      router.push(isAdminRegister ? "/admin/dashboard" : "/dashboard");
+      router.push("/");
     } catch (error) {
       console.error("Google Sign-in error:", error);
       toast.error("Failed to sign in with Google. Please try again.");

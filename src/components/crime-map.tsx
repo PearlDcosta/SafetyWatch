@@ -119,6 +119,7 @@ function ClusterLayer({
     });
 
     reports.forEach((report) => {
+      const incidentDate = getIncidentDate(report);
       const marker = L.marker(
         [report.location.geoPoint.latitude, report.location.geoPoint.longitude],
         { icon: createMapIcon(getIconColor(report.crimeType), markerSize) }
@@ -128,7 +129,7 @@ function ClusterLayer({
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
             <span class="font-medium capitalize">${report.crimeType.toLowerCase()}</span>
             <span>•</span>
-            <span>${format(new Date(report.date), "MMM d, yyyy")}</span>
+            <span>${incidentDate ? format(incidentDate, "MMM d, yyyy") : "-"}</span>
           </div>
           <p class="text-sm line-clamp-2 my-2">${report.description}</p>
           <a href="/reports/${report.id}" class="text-primary hover:underline text-sm font-medium">
@@ -145,6 +146,18 @@ function ClusterLayer({
       map.removeLayer(clusterGroup);
     };
   }, [map, reports, markerSize, getIconColor, createMapIcon]);
+  return null;
+}
+
+// Utility to get the correct incident date for a report
+function getIncidentDate(report: CrimeReport): Date | null {
+  if (report.incidentDateTime && !isNaN(new Date(report.incidentDateTime).getTime())) {
+    return new Date(report.incidentDateTime);
+  } else if (report.date && !isNaN(new Date(report.date).getTime())) {
+    return new Date(report.date);
+  } else if (report.createdAt && !isNaN(new Date(report.createdAt).getTime())) {
+    return new Date(report.createdAt);
+  }
   return null;
 }
 
@@ -375,35 +388,38 @@ export default function CrimeMap({ reports, isLoading }: CrimeMapProps) {
           />
         )}
 
-        {!showHeatmap && !showClusters && filteredReports.map((report) => (
-          <Marker
-            key={report.id}
-            position={[
-              report.location.geoPoint.latitude,
-              report.location.geoPoint.longitude,
-            ]}
-            icon={createMapIcon(getIconColor(report.crimeType), markerSize)}
-          >
-            <Popup>
-              <div className="max-w-[250px] space-y-1">
-                <h3 className="font-bold text-base">{report.title}</h3>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="font-medium capitalize">{report.crimeType.toLowerCase()}</span>
-                  <span>•</span>
-                  <span>{format(new Date(report.date), "MMM d, yyyy")}</span>
+        {!showHeatmap && !showClusters && filteredReports.map((report) => {
+          const incidentDate = getIncidentDate(report);
+          return (
+            <Marker
+              key={report.id}
+              position={[
+                report.location.geoPoint.latitude,
+                report.location.geoPoint.longitude,
+              ]}
+              icon={createMapIcon(getIconColor(report.crimeType), markerSize)}
+            >
+              <Popup>
+                <div className="max-w-[250px] space-y-1">
+                  <h3 className="font-bold text-base">{report.title}</h3>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className="font-medium capitalize">{report.crimeType.toLowerCase()}</span>
+                    <span>•</span>
+                    <span>{incidentDate ? format(incidentDate, "MMM d, yyyy") : "-"}</span>
+                  </div>
+                  <p className="text-sm line-clamp-2 my-2">{report.description}</p>
+                  <Link
+                    href={`/reports/${report.id}`}
+                    className="text-primary hover:underline text-sm font-medium"
+                    prefetch={false}
+                  >
+                    View Details →
+                  </Link>
                 </div>
-                <p className="text-sm line-clamp-2 my-2">{report.description}</p>
-                <Link
-                  href={`/reports/${report.id}`}
-                  className="text-primary hover:underline text-sm font-medium"
-                  prefetch={false}
-                >
-                  View Details →
-                </Link>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+              </Popup>
+            </Marker>
+          );
+        })}
 
         <RecenterMap lat={center[0]} lng={center[1]} />
       </MapContainer>

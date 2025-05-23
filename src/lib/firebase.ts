@@ -3,19 +3,16 @@ import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyBgcY8832ucdjVYRxWMY3U4nId8K8lf9hQ",
-  authDomain: "crimereport-ea80e.firebaseapp.com",
-  projectId: "crimereport-ea80e",
-  storageBucket: "crimereport-ea80e.appspot.com", // Fixed the storage bucket URL
-  messagingSenderId: "1026605655619",
-  appId: "1:1026605655619:web:6773be5bc2b4e3433e16f6",
-  measurementId: "G-CRGHS027V9",
+  apiKey: "AIzaSyCiq4s8OhAcR2aMzr_7Nj0HU0l3rpqRsd8",
+  authDomain: "safetywatch-bf642.firebaseapp.com",
+  projectId: "safetywatch-bf642",
+  storageBucket: "safetywatch-bf642.appspot.com",
+  messagingSenderId: "471009241837",
+  appId: "1:471009241837:web:1d5a0c72cede30d473fae4",
+  measurementId: "G-CB89LKBTQR",
 };
 
-// Initialize Firebase
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);

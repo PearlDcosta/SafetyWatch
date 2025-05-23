@@ -28,4 +28,9 @@ export interface CrimeReport {
   createdAt: string; // ISO string format
   updatedAt: string; // ISO string format
   trackingId?: string; // Optional tracking ID for anonymous reports
+  /**
+   * The ISO string for the incident date and time (user-selected, not report creation time).
+   * This is optional for backward compatibility.
+   */
+  incidentDateTime?: string;
 }

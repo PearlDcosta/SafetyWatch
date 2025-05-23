@@ -65,17 +65,34 @@ const processDataForCharts = (reports: CrimeReport[]) => {
       locationCounts[city] = (locationCounts[city] || 0) + 1;
     }
 
+    // --- Use incidentDateTime if present and valid, else date/time, else createdAt ---
+    let dateObj: Date | null = null;
+    let hour: string | undefined = undefined;
+    if (report.incidentDateTime && !isNaN(new Date(report.incidentDateTime).getTime())) {
+      dateObj = new Date(report.incidentDateTime);
+      hour = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (report.date && !isNaN(new Date(report.date).getTime())) {
+      dateObj = new Date(report.date);
+      hour = report.time;
+    } else if (report.createdAt && !isNaN(new Date(report.createdAt).getTime())) {
+      dateObj = new Date(report.createdAt);
+      hour = undefined;
+    }
+
     // Monthly
-    const month = new Date(report.date).toLocaleString("default", {
-      month: "short",
-      year: "numeric",
-    });
-    monthlyCounts[month] = (monthlyCounts[month] || 0) + 1;
+    if (dateObj) {
+      const month = dateObj.toLocaleString("default", {
+        month: "short",
+        year: "numeric",
+      });
+      monthlyCounts[month] = (monthlyCounts[month] || 0) + 1;
+    }
 
     // Hourly
-    const hour = report.time.split(":")[0];
     if (hour) {
-      hourlyCounts[hour] = (hourlyCounts[hour] || 0) + 1;
+      // Only use hour part (e.g. '14' or '14:30' -> '14')
+      const hourPart = hour.split(":")[0].padStart(2, '0');
+      hourlyCounts[hourPart] = (hourlyCounts[hourPart] || 0) + 1;
     }
   });
 
@@ -145,9 +162,11 @@ export default function CrimeStatsPage() {
       try {
         setLoading(true);
         const fetchedReports = await getPublicCrimeReports();
-        setReports(fetchedReports);
+        // Only use reports that are verified or resolved for statistics
+        const verifiedOrResolvedReports = fetchedReports.filter(r => r.status === "verified" || r.status === "resolved");
+        setReports(verifiedOrResolvedReports);
         const { crimeTypeData, locationData, monthlyData, hourlyData } =
-          processDataForCharts(fetchedReports);
+          processDataForCharts(verifiedOrResolvedReports);
         setCrimeTypeData(crimeTypeData);
         setLocationData(locationData);
         setMonthlyData(monthlyData);

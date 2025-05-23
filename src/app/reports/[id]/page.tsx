@@ -66,6 +66,13 @@ const getBadgeClass = (status: CrimeReport["status"]) => {
   }
 };
 
+// Helper to check if a date string is a valid ISO date
+function isValidDateString(dateString?: string) {
+  if (!dateString) return false;
+  const d = new Date(dateString);
+  return !isNaN(d.getTime());
+}
+
 export default function ReportDetailsPage() {
   const [report, setReport] = useState<CrimeReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -158,8 +165,21 @@ export default function ReportDetailsPage() {
     );
   }
 
+  // Use incidentDateTime if present and valid, else fallback to legacy date/time, else createdAt
+  let reportDate: Date;
+  let reportTime: string | undefined;
+  if (isValidDateString(report.incidentDateTime)) {
+    reportDate = new Date(report.incidentDateTime!);
+    reportTime = reportDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else if (isValidDateString(report.date)) {
+    reportDate = new Date(report.date);
+    reportTime = report.time;
+  } else {
+    reportDate = new Date(report.createdAt);
+    reportTime = undefined;
+  }
+
   const statusBadge = getStatusBadge(report.status);
-  const reportDate = new Date(report.date);
 
   return (
     <>
@@ -171,21 +191,6 @@ export default function ReportDetailsPage() {
           transition={{ duration: 0.3 }}
           className="flex flex-col gap-6"
         >
-          <Breadcrumb className="mb-6">
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/">Home</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/crimes">Reported Crimes</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbLink>Report Details</BreadcrumbLink>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
 
           {/* Header Section */}
           <motion.div
@@ -243,7 +248,7 @@ export default function ReportDetailsPage() {
                           <Calendar className="h-4 w-4" /> Date Occurred
                         </h3>
                         <p className="text-sm">
-                          {format(reportDate, "PPP")} at {report.time}
+                          {format(reportDate, "PPP")} {reportTime ? `at ${reportTime}` : ""}
                         </p>
                       </div>
                     </div>

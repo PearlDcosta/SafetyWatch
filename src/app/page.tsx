@@ -11,15 +11,27 @@ import { useAuth } from "@/context/auth-context";
 export default function Home() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, loading } = useAuth();
 
   const featureVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 }
   };
-
   // Hero section buttons
   const getHeroButtons = () => {
+    if (loading) {
+      return (
+        <>
+          <Button size="lg" disabled className="bg-gray-400 text-white font-semibold text-lg px-8 py-6">
+            Loading...
+          </Button>
+          <Button variant="outline" size="lg" disabled className="border-gray-400 text-gray-400 font-semibold text-lg px-8 py-6">
+            Loading...
+          </Button>
+        </>
+      );
+    }
+    
     if (user && isAdmin) {
       return (
         <>

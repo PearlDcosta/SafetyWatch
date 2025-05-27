@@ -30,8 +30,8 @@ import { useAuth } from "@/context/auth-context";
 import { createCrimeReport } from "@/lib/reports";
 import { extractDetailsFromImage } from "@/lib/gemini";
 import dynamic from "next/dynamic";
-import { Loader2, MapPin, Image as ImageIcon, AlertCircle, Crosshair, Copy } from "lucide-react";
-import { MainNav } from "@/components/main-nav";
+import { Loader2, MapPin, Image as ImageIcon, AlertCircle } from "lucide-react";
+import { ReportSuccess } from "./report-success";
 
 // Preload Leaflet assets
 const preloadLeaflet = () => {
@@ -41,7 +41,7 @@ const preloadLeaflet = () => {
     link.href = 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.css';
     link.as = 'style';
     document.head.appendChild(link);
-    
+
     const script = document.createElement('script');
     script.src = 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.js';
     script.async = true;
@@ -49,7 +49,6 @@ const preloadLeaflet = () => {
   }
 };
 
-// Dynamically import MapPicker with preloading
 const MapPicker = dynamic(() => {
   preloadLeaflet();
   return import("@/components/map-picker");
@@ -70,7 +69,7 @@ const formSchema = z.object({
   time: z.string({ required_error: "Please select a time." }),
   address: z.string().min(5, { message: "Please enter a valid address." }),
   isAnonymous: z.boolean(),
-  reporterContact: z.string().optional(), // Only required for authenticated
+  reporterContact: z.string().optional(),
 });
 
 type ReportFormValues = z.infer<typeof formSchema>;
@@ -80,22 +79,27 @@ interface ReportCrimeFormProps {
   onSuccess?: (trackingId?: string) => void;
 }
 
+function parseDDMMYYYYtoISO(dateStr: string) {
+  const [day, month, year] = dateStr.split("/");
+  if (!day || !month || !year) return "";
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function formatISOToDDMMYYYY(iso: string) {
+  if (!iso) return "";
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+function formatTimeToHHMM(time: string) {
+  if (!time) return "";
+  const [h, m] = time.split(":");
+  return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
+}
+
 export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCrimeFormProps) {
   const { user, isAdmin, loading } = useAuth();
   const router = useRouter();
-  // Prevent admins from submitting reports (show toast only once per session, even if remounted)
-  useEffect(() => {
-    if (!loading && isAdmin && typeof window !== "undefined") {
-      if (!sessionStorage.getItem("adminReportToastShown")) {
-        toast.error("Admins cannot submit reports.");
-        sessionStorage.setItem("adminReportToastShown", "1");
-      }
-    }
-  }, [isAdmin, loading]);
-  if (!loading && isAdmin) {
-    // Render nothing for admins
-    return null;
-  }
 
   const [isLoading, setIsLoading] = useState(false);
   const [trackingId, setTrackingId] = useState<string | null>(null);
@@ -107,6 +111,13 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
   const [formStep, setFormStep] = useState<"details" | "location" | "review">("details");
   const [isGettingLocation, setIsGettingLocation] = useState(false);
 
+  const today = new Date();
+  const defaultDate = today.toLocaleDateString("en-GB");
+  const defaultTime = today.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+  const [incidentDate, setIncidentDate] = useState<string>(defaultDate);
+  const [incidentTime, setIncidentTime] = useState<string>(defaultTime);
+
   const form = useForm<ReportFormValues>({
     resolver: zodResolver(formSchema),
     mode: "onChange",
@@ -117,19 +128,27 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
       date: new Date().toISOString().split("T")[0],
       time: new Date().toTimeString().slice(0, 5),
       address: "",
-      isAnonymous: !user, // true if not logged in, false if logged in
-      // reporterContact is not part of formSchema, so do not include here
+      isAnonymous: !user,
     },
   });
 
-  // Add reporterContact to form if authenticated
+  // --- All hooks above this line ---
+
+  // Early return after all hooks
+  useEffect(() => {
+    if (!loading && isAdmin && typeof window !== "undefined") {
+      if (!sessionStorage.getItem("adminReportToastShown")) {
+        toast.error("Admins cannot submit reports.");
+        sessionStorage.setItem("adminReportToastShown", "1");
+      }
+    }
+  }, [isAdmin, loading]);
+
   useEffect(() => {
     if (user?.email) {
-      // Set as a field in the form, but not part of validation schema
       form.register("reporterContact");
       form.setValue("reporterContact", user.email);
     } else {
-      // Unregister for anonymous
       form.unregister("reporterContact");
     }
   }, [user, form]);
@@ -149,6 +168,7 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
         { maximumAge: 60000, timeout: 3000 }
       );
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form]);
 
   async function getFullAddress(position: GeolocationPosition) {
@@ -161,20 +181,15 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
         form.setValue("address", data.display_name);
       }
     } catch (error) {
-      console.log("Background geocoding failed");
+      // Background geocoding failed
     }
   }
 
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files) return;
-
-    // Only add new images, up to 3 total
     const newImages = Array.from(files).slice(0, 3 - selectedImages.length);
-
-    // Only create URLs for actual files, not empty slots
     const newUrls = newImages.map(file => URL.createObjectURL(file));
-
     setSelectedImages(prev => [...prev, ...newImages]);
     setImageUrls(prev => [...prev, ...newUrls]);
   }
@@ -208,7 +223,6 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
         form.setValue("description", extractedDetails.DESCRIPTION);
         form.setValue("crimeType", extractedDetails.TYPE);
         toast.success("Details extracted from image", { id: toastId });
-        // FIX: Re-validate after extracting details to update formState
         await form.trigger([
           "title",
           "description",
@@ -220,7 +234,6 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
         toast.error("Could not extract details from image", { id: toastId });
       }
     } catch (error) {
-      console.error("Error extracting details from image:", error);
       toast.error("Failed to process image");
     } finally {
       setIsProcessingImage(false);
@@ -230,22 +243,14 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
   function handleLocationSelect(lat: number, lng: number, address: string) {
     setMapCoordinates({ lat, lng });
     form.setValue("address", address);
-    form.trigger("address"); // <-- Force validation after setting address
+    form.trigger("address");
   }
 
-  // Enhanced address validation: require both address and mapCoordinates
   function isLocationValid() {
     const address = form.getValues("address");
-    return (
-      address &&
-      address.length > 5 &&
-      mapCoordinates &&
-      typeof mapCoordinates.lat === "number" &&
-      typeof mapCoordinates.lng === "number"
-    );
+    return address && address.length > 5;
   }
 
-  // On submit handler
   const handleSubmit = async (values: ReportFormValues) => {
     if (!isLocationValid()) {
       toast.error("Cannot submit: Please select a valid location on the map or enter a valid address.");
@@ -254,54 +259,56 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
     setIsLoading(true);
     try {
       let trackingId: string | undefined = undefined;
+      const geoPoint = mapCoordinates
+        ? { latitude: mapCoordinates.lat, longitude: mapCoordinates.lng }
+        : { latitude: 23.373576, longitude: 82.840088 };
+      const isoDate = parseDDMMYYYYtoISO(incidentDate);
+      const isoDateTime = isoDate && incidentTime ? `${isoDate}T${incidentTime}:00` : null;
+
       let reportData: any = {
-        ...values,
-        isAnonymous: !user, // true if not logged in, false if logged in
+        title: values.title,
+        description: values.description,
+        crimeType: values.crimeType,
+        location: values.address,
+        geoPoint,
+        images: selectedImages,
+        status: "pending",
+        isAnonymous: isAnonymousMode,
         reporterId: user ? user.uid : null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        // Use user-selected date and time for incidentDateTime
-        incidentDateTime: `${values.date}T${values.time}`,
+        reporterName: user ? user.displayName : null,
+        reporterContact: user && !isAnonymousMode ? user.email : null,
+        actionDetails: undefined,
+        incidentDate: values.date,
+        incidentTime: values.time,
+        incidentDateTime: isoDateTime ? new Date(isoDateTime).toISOString() : null,
+        userId: user ? user.uid : null,
       };
+
       if (user && user.displayName) {
         reportData.reporterName = user.displayName;
       }
-      if (!reportData.reporterName) {
-        delete reportData.reporterName;
-      }
-      if (user && user.email) {
+      if (user && user.email && !isAnonymousMode) {
         reportData.reporterContact = user.email;
-      } else {
-        delete reportData.reporterContact;
       }
-      if (!user) {
-        // Generate tracking ID for anonymous
-        trackingId = Array.from(
-          window.crypto.getRandomValues(new Uint8Array(8))
-        ).map((b) => b.toString(16).padStart(2, "0")).join("");
-        reportData.trackingId = trackingId;
-      }
-      reportData.location = {
-        address: values.address,
-        geoPoint: mapCoordinates ? { latitude: mapCoordinates.lat, longitude: mapCoordinates.lng } : null
-      };
-      // Remove date and time fields from top-level (optional, for clarity)
-      delete reportData.date;
-      delete reportData.time;
+
       const created = await createCrimeReport(reportData, selectedImages);
       setIsLoading(false);
-      // Show tracking ID to user after submission (even if logged in)
-      if (onSuccess) onSuccess(trackingId || created.id);
-      else if (!user && (trackingId || created.id)) {
-        setTrackingId(trackingId || created.id);
-      } else if (user && (trackingId || created.id)) {
-        setTrackingId(trackingId || created.id);
-      } else {
-        router.push("/dashboard");
-      }
+      form.reset({
+        title: "",
+        description: "",
+        crimeType: "",
+        date: new Date().toISOString().split("T")[0],
+        time: new Date().toTimeString().slice(0, 5),
+        address: "",
+        isAnonymous: !user,
+      });
+      setSelectedImages([]);
+      setImageUrls([]);
+      setMapCoordinates(null);
+      if (onSuccess) onSuccess(created.trackingId);
+      else setTrackingId(created.trackingId);
     } catch (error) {
       setIsLoading(false);
-      console.error("Error submitting report:", error);
       toast.error("Failed to submit report");
     }
   };
@@ -316,39 +323,17 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
     { value: "other", label: "Other" },
   ];
 
-  // If trackingId is set (anonymous or user), show confirmation
+  // Early return after all hooks
+  if (!loading && isAdmin) {
+    return null;
+  }
+
   if (trackingId) {
-    return (
-      <div className="p-6 text-center">
-        <h2 className="text-lg font-semibold mb-2">Report Submitted</h2>
-        <p className="mb-2">Your tracking ID is:</p>
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <span className="font-mono text-blue-600 text-xl select-all">{trackingId}</span>
-          <button
-            className="ml-2 px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm border border-gray-300 flex items-center gap-1"
-            onClick={() => {
-              navigator.clipboard.writeText(trackingId);
-              toast.success('Copied to clipboard');
-            }}
-            title="Copy tracking ID"
-            aria-label="Copy tracking ID"
-          >
-            <Copy className="w-4 h-4" />
-          </button>
-        </div>
-        <p className="text-sm text-muted-foreground mb-4">Please save this ID to track your report status. You will not be able to retrieve it again.</p>
-        {user ? (
-          <button className="btn btn-primary" onClick={() => router.push("/dashboard")}>Go to Dashboard</button>
-        ) : (
-          <button className="btn btn-primary" onClick={() => router.push("/track/" + trackingId)}>Track Report</button>
-        )}
-      </div>
-    );
+    return <ReportSuccess trackingId={trackingId} user={user} />;
   }
 
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden max-w-4xl mx-auto">
-      {/* Form Header */}
       <div className="bg-primary px-8 py-6">
         <h2 className="text-2xl font-bold text-white">
           Crime Incident Report
@@ -357,8 +342,6 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
           Help keep your community safe by reporting criminal activity
         </p>
       </div>
-
-      {/* Progress Steps */}
       <div className="px-8 pt-6 pb-2 border-b">
         <div className="flex items-center justify-between">
           {["details", "location", "review"].map((step, index) => (
@@ -397,13 +380,10 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
           <span className={formStep === "review" ? "text-primary font-medium" : ""}>Review</span>
         </div>
       </div>
-
-      {/* Form Content */}
       <div className="p-8">
         <Form {...form}>
           <form
             onSubmit={e => {
-              // Only allow submit if triggered by the explicit submit button
               const submitter = (e.nativeEvent as SubmitEvent).submitter;
               if (
                 submitter &&
@@ -418,12 +398,11 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
             }}
             className="space-y-8"
             onKeyDown={e => {
-              // Prevent Enter from submitting or progressing unless in textarea or multiline input
               const tag = (e.target as HTMLElement).tagName.toLowerCase();
               const type = (e.target as HTMLInputElement).type;
               if (e.key === "Enter") {
-                if (tag === "textarea") return; // allow newlines in textarea
-                if (tag === "input" && (type === "text" || type === "email" || type === "search")) return; // allow in text fields
+                if (tag === "textarea") return;
+                if (tag === "input" && (type === "text" || type === "email" || type === "search")) return;
                 e.preventDefault();
               }
             }}
@@ -452,7 +431,7 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
                           />
                         </FormControl>
                         <FormDescription>
-                          Be concise but descriptive (e.g., "Car Break-in on Main St")
+                          Be concise but descriptive
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -626,7 +605,6 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
                     <Button
                       type="button"
                       onClick={async () => {
-                        // Always trigger validation and only proceed if valid
                         const isValid = await form.trigger([
                           "title",
                           "crimeType",
@@ -683,7 +661,6 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
                           : undefined
                       }
                     />
-                    {/* Button below zoom controls (top-4 left-4) */}
                     <button
                       type="button"
                       disabled={isGettingLocation}
@@ -710,12 +687,10 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
                                 lat: position.coords.latitude,
                                 lng: position.coords.longitude
                               });
-                              // Set a temporary address
                               form.setValue(
                                 "address",
                                 `Near ${position.coords.latitude.toFixed(2)}, ${position.coords.longitude.toFixed(2)}`
                               );
-                              // Now fetch the real address and update the field
                               try {
                                 const response = await fetch(
                                   `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}`
@@ -736,7 +711,6 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
                               setIsGettingLocation(false);
                               toast.dismiss();
                               toast.error("Unable to get your current position");
-                              console.error("Geolocation error:", error);
                             },
                             { maximumAge: 60000, timeout: 5000 }
                           );
@@ -765,7 +739,6 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
                             {...field}
                             onBlur={async (e) => {
                               field.onBlur?.();
-                              // Only update map if address changed and input is blurred
                               const address = e.target.value;
                               if (address && address.length > 5) {
                                 try {
@@ -779,9 +752,7 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
                                       lng: parseFloat(data[0].lon),
                                     });
                                   }
-                                  // If not found, do not update mapCoordinates (map stays at last position)
                                 } catch {
-                                  // ignore geocode errors
                                 }
                               }
                             }}
@@ -803,7 +774,6 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
                     <Button
                       type="button"
                       onClick={async () => {
-                        // Always trigger validation and only proceed if valid address AND mapCoordinates
                         const isValid = await form.trigger(["address"]);
                         if (isValid && isLocationValid()) setFormStep("review");
                         else {
@@ -864,7 +834,7 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Date & Time</p>
+                          <p className="text-xs text-gray-500">Date &amp; Time</p>
                           <p className="font-medium">
                             {form.getValues("date") && form.getValues("time")
                               ? `${new Date(form.getValues("date")).toLocaleDateString()} at ${form.getValues("time")}`
@@ -876,7 +846,7 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
                     </div>
 
                     <div className="bg-gray-50 rounded-lg p-6 shadow-sm border">
-                      <h4 className="font-semibold text-lg mb-4 text-primary">Location & Contact</h4>
+                      <h4 className="font-semibold text-lg mb-4 text-primary">Location &amp; Contact</h4>
                       <div className="space-y-3">
                         <div>
                           <p className="text-xs text-gray-500">Address</p>
@@ -896,16 +866,9 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
                           <p className="font-medium">
                             {form.getValues("isAnonymous")
                               ? "Anonymous"
-                              : user?.displayName || "Registered User"}
+                              : user ? <>{user.displayName}<br />{user.email}</> : <span className="text-gray-400">Not specified</span>}
                           </p>
                         </div>
-                        {/* Show contact info only for authenticated users */}
-                        {!form.getValues("isAnonymous") && form.getValues("reporterContact") && (
-                          <div>
-                            <p className="text-xs text-gray-500">Contact Email</p>
-                            <p className="font-medium">{form.getValues("reporterContact")}</p>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -917,7 +880,6 @@ export function ReportCrimeForm({ isAnonymousMode = false, onSuccess }: ReportCr
                         {imageUrls.map((url, index) => (
                           <div key={index} className="aspect-square rounded-lg overflow-hidden border bg-gray-100 flex items-center justify-center">
                             {url ? (
-                              // Defensive: only render img if url is a non-empty string
                               <img
                                 src={typeof url === "string" && url ? url : undefined}
                                 alt={`Evidence ${index + 1}`}

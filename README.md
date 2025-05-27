@@ -1,95 +1,76 @@
-# SafetyWatch: Crime Reporting & Tracking Platform
+# SafetyWatch
 
-SafetyWatch is a modern, full-stack web application for reporting, tracking, and managing crime incidents. Built with Next.js, Firebase, and Tailwind CSS, it provides a secure, user-friendly experience for citizens and administrators.
+SafetyWatch is a modern, full-stack web application for reporting, tracking, and analyzing crime incidents in your community. It features real-time reporting, admin and user dashboards, interactive crime maps, and robust statistics, all with a focus on speed, security, and usability.
 
----
+## Features
 
-## 🚀 Getting Started
+- Submit crime reports (anonymous or authenticated)
+- Admin dashboard for managing and verifying reports
+- User dashboard for tracking submitted reports
+- Interactive map with clustering and heatmap
+- Advanced search and filtering
+- Real-time statistics and trends
+- Email notifications (if configured)
+- Secure authentication (Google OAuth)
+- Responsive, mobile-friendly UI
 
-1. **Install dependencies:**
-   ```bash
-   npm install
-   # or
-   yarn install
-   # or
-   pnpm install
-   ```
+## Tech Stack
 
-2. **Run the development server:**
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   # or
-   pnpm dev
-   # or
-   bun dev
-   ```
+- Next.js (App Router, SSR/SSG)
+- React, TypeScript
+- Tailwind CSS
+- Prisma ORM
+- MySQL (Azure or local)
+- SWR for client-side caching
+- Framer Motion for animations
+- Lucide Icons
 
-3. **Open your browser:**
-   Visit [http://localhost:3000](http://localhost:3000)
+## Getting Started
 
----
-
-## 🛠️ Features
-- **Anonymous & Authenticated Reporting**: Submit crime reports with or without an account.
-- **Real-Time Tracking**: Track report status using a unique tracking ID.
-- **Admin Dashboard**: Review, verify, and manage reports with advanced filtering and sorting.
-- **Interactive Map**: Visualize crime locations and heatmaps.
-- **Image Upload & AI Extraction**: Attach evidence and auto-extract details from images (Gemini AI, OCR).
-- **Modern UI/UX**: Responsive, accessible, and visually polished interface.
-
----
-
-## 📦 Tech Stack
-- **Framework**: [Next.js](https://nextjs.org)
-- **Database & Auth**: [Firebase](https://firebase.google.com)
-- **UI**: [Tailwind CSS](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com/)
-- **Maps**: [Leaflet.js](https://leafletjs.com/)
-- **AI/ML**: Google Gemini, OCR.space
-- **State Management**: React Context
-
----
-
-## 📁 Project Structure
-- `src/app/` — Main app routes (dashboard, reports, admin, etc.)
-- `src/components/` — Reusable UI and feature components
-- `src/lib/` — Utilities, API, and data logic
-- `src/types/` — TypeScript types
-- `public/` — Static assets (map icons, images)
-
----
-
-## 🔒 Environment Variables
-Create a `.env.local` file for your Firebase and API keys:
+### 1. Clone the repository
 ```
-NEXT_PUBLIC_FIREBASE_API_KEY=...
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
-NEXT_PUBLIC_FIREBASE_APP_ID=...
-NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=...
-NEXT_PUBLIC_OCR_SPACE_API_KEY=...
+git clone <your-repo-url>
+cd SafetyWatch
 ```
 
----
+### 2. Install dependencies
+```
+npm install
+```
 
-## 📝 Customization & Deployment
-- **Styling**: Tailwind config in `tailwind.config.js`, PostCSS in `postcss.config.mjs`.
-- **Build**: `npm run build` and `npm start` for production.
-- **Deploy**: Easily deploy to [Vercel](https://vercel.com/) or any Node.js host.
+### 3. Configure environment variables
+Create a `.env.local` file in the root directory:
+```
+NEXT_PUBLIC_OCR_SPACE_API_KEY=your_ocr_api_key
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
+DATABASE_URL="mysql://user:password@host:port/dbname?sslaccept=strict"
+```
 
----
+### 4. Set up the database
+If using Prisma:
+```
+npx prisma migrate deploy
+# or for development
+npx prisma db push
+```
 
-## 📚 Learn More
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Firebase Documentation](https://firebase.google.com/docs)
-- [Tailwind CSS Docs](https://tailwindcss.com/docs)
-- [shadcn/ui Docs](https://ui.shadcn.com/docs)
+### 5. Run the development server
+```
+npm run dev
+```
+Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
----
+## Deployment
+- Configure your production `.env` variables.
+- Deploy to Vercel, Azure, or your preferred platform.
+- Ensure your database is accessible from your deployment environment.
 
-## 👤 Author & License
-- Built by Pearl Arun Dcosta
-- MIT License
+## Notes
+- For best performance, use a production-grade MySQL tier and enable pagination for large datasets.
+- All sensitive operations are protected by authentication and role checks.
+- For OCR features, sign up for a free API key at [ocr.space](https://ocr.space/).
+
+## License
+MIT

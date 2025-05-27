@@ -20,6 +20,7 @@ export default function RegisterPage() {
     confirmPassword: ""
   });
   const { register, signInWithGoogle } = useAuth();
+  const [registerAs, setRegisterAs] = useState<'user' | 'admin'>('user'); // New state: 'user' or 'admin'
 
   useEffect(() => {
     setIsHydrated(true);
@@ -34,9 +35,9 @@ export default function RegisterPage() {
     }
 
     try {
-      await register(formData.email, formData.password, formData.name);
+      await register(formData.email, formData.password, formData.name, registerAs === 'admin');
       toast.success("Registration successful!");
-      router.push("/dashboard");
+      router.push("/"); // <-- redirect to homepage
     } catch (error: any) {
       toast.error(error.message || "Registration failed.");
     }
@@ -44,9 +45,9 @@ export default function RegisterPage() {
 
   const handleGoogleRegister = async () => {
     try {
-      await signInWithGoogle();
+      await signInWithGoogle(registerAs === 'admin'); // Pass isAdminRegistration
       toast.success("Registered with Google successfully!");
-      router.push("/dashboard");
+      router.push("/"); // <-- redirect to homepage
     } catch (error: any) {
       toast.error(error.message || "Google registration failed.");
     }
@@ -190,6 +191,29 @@ export default function RegisterPage() {
                   </motion.div>
                 </div>
 
+                {/* Register As Options */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="flex items-center justify-around"
+                >
+                  <Button
+                    type="button"
+                    variant={registerAs === 'user' ? 'default' : 'outline'}
+                    onClick={() => setRegisterAs('user')}
+                  >
+                    Register as User
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={registerAs === 'admin' ? 'default' : 'outline'}
+                    onClick={() => setRegisterAs('admin')}
+                  >
+                    Register as Admin
+                  </Button>
+                </motion.div>
+
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -235,6 +259,11 @@ export default function RegisterPage() {
                   className="flex items-center justify-center gap-2"
                   type="button"
                   onClick={handleGoogleRegister}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleGoogleRegister();
+                    }
+                  }}
                 >
                   <FaGoogle className="w-4 h-4" />
                   Google

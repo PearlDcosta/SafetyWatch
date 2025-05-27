@@ -11,7 +11,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/ui/footer";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/context/auth-context"; // Add this import
+import { useAuth } from "@/context/auth-context"; 
+import { formatReportDateTime } from "@/lib/utils";
 
 const CrimeMap = dynamic(() => import("@/components/crime-map"), {
   ssr: false,
@@ -41,8 +42,8 @@ export default function CrimeMapPage() {
         const validReports = allReports.filter(
           (report) =>
             (report.status === "verified" || report.status === "resolved") &&
-            report.location?.geoPoint?.latitude &&
-            report.location?.geoPoint?.longitude
+            report.geoPoint?.latitude &&
+            report.geoPoint?.longitude
         );
         
         if (validReports.length === 0) {

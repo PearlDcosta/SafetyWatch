@@ -172,6 +172,11 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
           variant="outline"
           className="w-full"
           onClick={handleGoogleSignIn}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !isLoading && !isGoogleLoading) {
+              handleGoogleSignIn();
+            }
+          }}
           disabled={isLoading || isGoogleLoading}
         >
           {isGoogleLoading ? (
@@ -186,7 +191,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       </CardContent>
       <CardFooter className="flex flex-col gap-4">
         <div className="text-center text-sm">
-          Don't have an account?{" "}
+          Do not have an account?{" "}
           <Link
             href={isAdminLogin ? "/register?admin=true" : "/register"}
             className="text-primary underline underline-offset-4 hover:text-primary/80"

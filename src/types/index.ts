@@ -8,29 +8,19 @@ export interface CrimeReport {
   title: string;
   description: string;
   crimeType: string;
-  location: {
-    address: string;
-    geoPoint: GeoPoint;
-  };
-  date: string; // ISO string format
-  time: string;
-  images?: {
-    url: string; // Base64 encoded image data
-    publicId: string; // Unique identifier
-    thumbnail: string; // Base64 encoded thumbnail
-  }[];
-  status: "pending" | "reviewing" | "verified" | "resolved" | "rejected"; // Updated statuses
+  location: string;
+  geoPoint: any;
+  images?: any;
+  status: string;
   isAnonymous: boolean;
-  reporterId?: string; // Only set if not anonymous
-  reporterName?: string; // Only set if not anonymous
-  reporterContact: string; // <-- Now required, not optional
-  actionDetails?: string; // Added by admin when taking action
-  createdAt: string; // ISO string format
-  updatedAt: string; // ISO string format
-  trackingId?: string; // Optional tracking ID for anonymous reports
-  /**
-   * The ISO string for the incident date and time (user-selected, not report creation time).
-   * This is optional for backward compatibility.
-   */
-  incidentDateTime?: string;
+  reporterId?: string;
+  reporterName?: string;
+  reporterContact?: string;
+  actionDetails?: string;
+  trackingId: string; // 16-character hex code
+  incidentDate: string;
+  incidentTime: string;
+  incidentDateTime: string; // ISO string
+  userId?: string;
+  updatedAt: string;
 }

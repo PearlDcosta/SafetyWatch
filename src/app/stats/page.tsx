@@ -21,6 +21,7 @@ import { MainNav } from "@/components/main-nav";
 import { Footer } from "@/components/ui/footer";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatReportDateTime } from "@/lib/utils";
 
 const COLORS = [
   "#3b82f6", // blue-500
@@ -50,13 +51,14 @@ const processDataForCharts = (reports: CrimeReport[]) => {
 
   reports.forEach((report) => {
     // Defensive: skip if no location
-    if (!report.location || !report.location.address) return;
+    if (!report.location) return;
+
     // Crime Type
     crimeTypeCounts[report.crimeType] =
       (crimeTypeCounts[report.crimeType] || 0) + 1;
 
     // Location
-    const addressParts = report.location.address.split(",");
+    const addressParts = report.location.split(",");
     const city =
       addressParts.length > 1
         ? addressParts[addressParts.length - 2]?.trim()
@@ -65,34 +67,26 @@ const processDataForCharts = (reports: CrimeReport[]) => {
       locationCounts[city] = (locationCounts[city] || 0) + 1;
     }
 
-    // --- Use incidentDateTime if present and valid, else date/time, else createdAt ---
+    // Use incidentDate and incidentTime if present, else incidentDateTime
     let dateObj: Date | null = null;
-    let hour: string | undefined = undefined;
-    if (report.incidentDateTime && !isNaN(new Date(report.incidentDateTime).getTime())) {
+    if (report.incidentDate && report.incidentTime) {
+      // Always convert to ISO format for parsing
+      let isoDate = report.incidentDate.replace(/\//g, "-");
+      dateObj = new Date(`${isoDate}T${report.incidentTime}`);
+    } else if (report.incidentDateTime) {
       dateObj = new Date(report.incidentDateTime);
-      hour = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } else if (report.date && !isNaN(new Date(report.date).getTime())) {
-      dateObj = new Date(report.date);
-      hour = report.time;
-    } else if (report.createdAt && !isNaN(new Date(report.createdAt).getTime())) {
-      dateObj = new Date(report.createdAt);
-      hour = undefined;
     }
 
-    // Monthly
-    if (dateObj) {
-      const month = dateObj.toLocaleString("default", {
-        month: "short",
-        year: "numeric",
-      });
+    if (dateObj && !isNaN(dateObj.getTime())) {
+      // Monthly: yyyy/mm
+      const month = `${dateObj.getFullYear()}/${(dateObj.getMonth() + 1)
+        .toString()
+        .padStart(2, "0")}`;
       monthlyCounts[month] = (monthlyCounts[month] || 0) + 1;
-    }
 
-    // Hourly
-    if (hour) {
-      // Only use hour part (e.g. '14' or '14:30' -> '14')
-      const hourPart = hour.split(":")[0].padStart(2, '0');
-      hourlyCounts[hourPart] = (hourlyCounts[hourPart] || 0) + 1;
+      // Hourly: hh
+      const hour = dateObj.getHours().toString().padStart(2, "0");
+      hourlyCounts[hour] = (hourlyCounts[hour] || 0) + 1;
     }
   });
 
@@ -107,11 +101,11 @@ const processDataForCharts = (reports: CrimeReport[]) => {
 
   const monthlyData: CrimeStatsData[] = Object.entries(monthlyCounts)
     .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const hourlyData: CrimeStatsData[] = Object.entries(hourlyCounts)
     .map(([name, count]) => ({ name: `${name}:00`, count }))
-    .sort((a, b) => parseInt(a.name.split(":")[0]) - parseInt(b.name.split(":")[0]));
+    .sort((a, b) => parseInt(a.name) - parseInt(b.name));
 
   return { crimeTypeData, locationData, monthlyData, hourlyData };
 };
@@ -163,7 +157,9 @@ export default function CrimeStatsPage() {
         setLoading(true);
         const fetchedReports = await getPublicCrimeReports();
         // Only use reports that are verified or resolved for statistics
-        const verifiedOrResolvedReports = fetchedReports.filter(r => r.status === "verified" || r.status === "resolved");
+        const verifiedOrResolvedReports = Array.isArray(fetchedReports)
+          ? fetchedReports.filter(r => r.status === "verified" || r.status === "resolved")
+          : [];
         setReports(verifiedOrResolvedReports);
         const { crimeTypeData, locationData, monthlyData, hourlyData } =
           processDataForCharts(verifiedOrResolvedReports);
@@ -174,6 +170,11 @@ export default function CrimeStatsPage() {
         setError(null);
       } catch (err) {
         console.error("Error fetching crime reports for stats:", err);
+        setReports([]); // Ensure reports is always an array
+        setCrimeTypeData([]);
+        setLocationData([]);
+        setMonthlyData([]);
+        setHourlyData([]);
         setError("Failed to load crime statistics. Please try again later.");
       } finally {
         setLoading(false);
@@ -246,6 +247,13 @@ export default function CrimeStatsPage() {
             Visualizing crime trends and patterns
           </p>
         </motion.header>
+
+        {/* Optionally show the most recent report date/time for context */}
+        {reports.length > 0 && (
+          <div className="text-right text-xs text-muted-foreground mb-2">
+            Latest report: {formatReportDateTime(reports[0]).combined}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <ChartCard title="Crime Types Distribution" loading={loading}>

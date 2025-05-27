@@ -90,8 +90,6 @@ export async function extractDetailsFromImage(
   imageFile: File
 ): Promise<ExtractedDetails | null> {
   if (!imageFile) {
-    // It's better to throw an error or return a specific error object if the input is invalid.
-    // For now, returning null as per existing logic, but consider changing this.
     console.error("No image file provided to extractDetailsFromImage.");
     return null;
   }
@@ -141,7 +139,7 @@ Example JSON output:
 
 Provide only the JSON object in your response.
 Image:`,
-    }; // Corrected backtick usage and ensured it's a Part object
+    };
 
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [imagePart, promptTextPart] }], // Ensure parts is an array of Part

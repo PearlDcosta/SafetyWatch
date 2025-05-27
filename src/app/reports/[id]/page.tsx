@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { format } from "date-fns";
 import {
   ArrowLeft,
   Clock,
@@ -42,6 +41,7 @@ import { useAuth } from "@/context/auth-context";
 import { getCrimeReport } from "@/lib/reports";
 import { CrimeReport } from "@/types";
 import dynamic from "next/dynamic";
+import { formatReportDateTime } from "@/lib/utils";
 
 const MapPickerReadOnly = dynamic(() => import("@/components/map-picker"), {
   ssr: false,
@@ -165,19 +165,8 @@ export default function ReportDetailsPage() {
     );
   }
 
-  // Use incidentDateTime if present and valid, else fallback to legacy date/time, else createdAt
-  let reportDate: Date;
-  let reportTime: string | undefined;
-  if (isValidDateString(report.incidentDateTime)) {
-    reportDate = new Date(report.incidentDateTime!);
-    reportTime = reportDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } else if (isValidDateString(report.date)) {
-    reportDate = new Date(report.date);
-    reportTime = report.time;
-  } else {
-    reportDate = new Date(report.createdAt);
-    reportTime = undefined;
-  }
+  // Use the same logic as the track page for incident date/time
+  const { date: incidentDateStr, time: incidentTimeStr } = report ? formatReportDateTime(report) : { date: '-', time: '-' };
 
   const statusBadge = getStatusBadge(report.status);
 
@@ -206,7 +195,7 @@ export default function ReportDetailsPage() {
                   {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
                 </Badge>
                 <div className="text-sm text-muted-foreground">
-                  Reported on {format(new Date(report.createdAt), "PPPp")}
+                  Reported on {incidentDateStr !== '-' ? `${incidentDateStr}${incidentTimeStr !== '-' ? ' ' + incidentTimeStr : ''}` : '-'}
                 </div>
               </div>
             </div>
@@ -241,14 +230,18 @@ export default function ReportDetailsPage() {
                         <h3 className="font-medium flex items-center gap-2 text-muted-foreground">
                           <Tag className="h-4 w-4" /> Crime Type
                         </h3>
-                        <p className="text-sm">{report.crimeType}</p>
+                        <p className="text-sm">
+                          {report.crimeType
+                            ? report.crimeType.charAt(0).toUpperCase() + report.crimeType.slice(1)
+                            : ""}
+                        </p>
                       </div>
                       <div className="space-y-1">
                         <h3 className="font-medium flex items-center gap-2 text-muted-foreground">
                           <Calendar className="h-4 w-4" /> Date Occurred
                         </h3>
                         <p className="text-sm">
-                          {format(reportDate, "PPP")} {reportTime ? `at ${reportTime}` : ""}
+                          {incidentDateStr !== '-' ? `${incidentDateStr}${incidentTimeStr !== '-' ? ' ' + incidentTimeStr : ''}` : '-'}
                         </p>
                       </div>
                     </div>
@@ -270,14 +263,14 @@ export default function ReportDetailsPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="p-3 bg-gray-50 rounded-md">
-                      <p className="font-medium">{report.location?.address || "N/A"}</p>
+                      <p className="font-medium">{report.location || "N/A"}</p>
                     </div>
-                    {report.location?.geoPoint ? (
+                    {report.geoPoint ? (
                       <div className="h-[300px] rounded-md overflow-hidden border">
                         <MapPickerReadOnly
                           initialCoordinates={[
-                            report.location.geoPoint.latitude,
-                            report.location.geoPoint.longitude,
+                            report.geoPoint.latitude,
+                            report.geoPoint.longitude,
                           ]}
                           readOnly={true}
                         />
@@ -292,7 +285,7 @@ export default function ReportDetailsPage() {
               </motion.div>
 
               {/* Evidence Images */}
-              {report.images && report.images.length > 0 && (
+              {Array.isArray(report.images) && report.images.length > 0 && (
                 <motion.div
                   initial={{ y: 10, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
@@ -306,21 +299,25 @@ export default function ReportDetailsPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {report.images.map((image, index) => (
-                          <motion.div
-                            key={index}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="relative aspect-square rounded-md overflow-hidden border cursor-pointer"
-                            onClick={() => setActiveImage(image.url)}
-                          >
-                            <img
-                              src={image.url}
-                              alt={`Evidence ${index + 1}`}
-                              className="object-cover w-full h-full"
-                            />
-                          </motion.div>
-                        ))}
+                        {report.images.map((image, index) => {
+                          const url = typeof image === "string" ? image : image?.url;
+                          if (!url) return null;
+                          return (
+                            <motion.div
+                              key={index}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              className="relative aspect-square rounded-md overflow-hidden border cursor-pointer"
+                              onClick={() => setActiveImage(url)}
+                            >
+                              <img
+                                src={url}
+                                alt={`Evidence ${index + 1}`}
+                                className="object-cover w-full h-full"
+                              />
+                            </motion.div>
+                          );
+                        })}
                       </div>
                     </CardContent>
                   </Card>
@@ -366,7 +363,11 @@ export default function ReportDetailsPage() {
                         Last Updated
                       </h3>
                       <p className="text-sm">
-                        {format(new Date(report.updatedAt), "PPPp")}
+                        {(() => {
+                          const d = new Date(report.updatedAt);
+                          function pad(n: number) { return n < 10 ? '0' + n : n; }
+                          return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                        })()}
                       </p>
                     </div>
                   </CardContent>

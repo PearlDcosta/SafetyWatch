@@ -89,7 +89,7 @@ export default function DashboardPage() {
           <Card>
             <CardContent className="pt-10 pb-10 text-center">
               <p className="text-muted-foreground">
-                You haven't submitted any reports yet.
+                You haven not submitted any reports yet.
               </p>
               <Link href="/reports/new">
                 <Button className="mt-4">Create Your First Report</Button>
@@ -107,9 +107,20 @@ export default function DashboardPage() {
                   <CardHeader>
                     <CardTitle className="line-clamp-1">{report.title}</CardTitle>
                     <CardDescription>
-                      <span className="block">
-                        {new Date(report.date).toLocaleDateString()} •{" "}
-                        {report.time}
+                      <span>
+                        {report.incidentDate && report.incidentTime
+                          ? `${report.incidentDate} • ${report.incidentTime}`
+                          : report.incidentDateTime
+                          ? `${new Date(report.incidentDateTime).toLocaleDateString(
+                              "en-GB"
+                            )} • ${new Date(
+                              report.incidentDateTime
+                            ).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: false,
+                            })}`
+                          : "-"}
                       </span>
                       <span className="block mt-2">
                         <span
@@ -136,7 +147,7 @@ export default function DashboardPage() {
                       {report.description}
                     </p>
                     <p className="mt-4 text-sm">
-                      <strong>Location:</strong> {report.location?.address || "N/A"}
+                      <strong>Location:</strong> {report.location || "N/A"}
                     </p>
                   </CardContent>
                   <CardFooter className="flex gap-2 pt-4">

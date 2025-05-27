@@ -5,7 +5,7 @@ import { CrimeReport } from "@/types";
 import { getPublicCrimeReports } from "@/lib/reports";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { calculateDistance } from "@/lib/utils";
+import { calculateDistance, formatReportDateTime } from "@/lib/utils";
 import { MainNav } from "@/components/main-nav";
 import { Footer } from "@/components/ui/footer";
 import { toast } from "sonner";
@@ -32,34 +32,34 @@ export default function CrimesPage() {
       setIsSorting(true);
 
       if (sortType === "nearby" && userLocation) {
-        // Only sort reports that have valid location.geoPoint
+        // Only sort reports that have valid geoPoint
         return [...reportsToProcess]
-          .filter(r => r.location && r.location.geoPoint)
+          .filter(r => r.geoPoint)
           .sort((a, b) => {
             const distA = calculateDistance(
               userLocation.latitude,
               userLocation.longitude,
-              a.location.geoPoint.latitude,
-              a.location.geoPoint.longitude
+              a.geoPoint!.latitude,
+              a.geoPoint!.longitude
             );
             const distB = calculateDistance(
               userLocation.latitude,
               userLocation.longitude,
-              b.location.geoPoint.latitude,
-              b.location.geoPoint.longitude
+              b.geoPoint!.latitude,
+              b.geoPoint!.longitude
             );
             return distA - distB;
           });
       } else {
         return [...reportsToProcess].sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          (a, b) => new Date(b.incidentDateTime).getTime() - new Date(a.incidentDateTime).getTime()
         );
       }
     } catch (err) {
       console.error("Error sorting reports:", err);
       toast.error("Error sorting reports. Showing all reports by date.");
       return reportsToProcess.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        (a, b) => new Date(b.incidentDateTime).getTime() - new Date(a.incidentDateTime).getTime()
       );
     } finally {
       setIsSorting(false);
@@ -197,10 +197,11 @@ export default function CrimesPage() {
               whileTap={{ scale: 0.95 }}
               className="mt-4"
               onClick={() => window.location.reload()}
+              type="button"
             >
-              <Button variant="outline" className="w-full">
+              <span className="block w-full">
                 Try Again
-              </Button>
+              </span>
             </motion.button>
           </motion.div>
         </div>
@@ -275,25 +276,29 @@ export default function CrimesPage() {
                     style={{ fontFamily: 'Aptos, sans-serif' }}
                   >
                     <CardHeader className="p-0 mb-2">
-                      <CardTitle className="text-lg text-[#000040]">{report.title}</CardTitle>
-                      <p className="text-sm text-blue-900">
-                        {report.crimeType} • {new Date(report.createdAt).toLocaleDateString()}
-                      </p>
-                    </CardHeader>
+  <CardTitle className="text-lg text-[#000040]">{report.title}</CardTitle>
+  <p className="text-sm text-blue-900">
+    {/* Capitalize first letter of crimeType */}
+    {report.crimeType
+      ? report.crimeType.charAt(0).toUpperCase() + report.crimeType.slice(1)
+      : ""}
+    {"  • "}{formatReportDateTime(report).combined}
+  </p>
+</CardHeader>
                     <CardContent className="flex-grow p-0">
                       <p className="text-sm mb-5 line-clamp-3 text-justify text-blue-900">
                         {report.description}
                       </p>
                       <p className="text-xs text-blue-700 mb-1 truncate">
-                        Location: {report.location?.address || "N/A"}
+                        Location: {report.location || "N/A"}
                       </p>
-                      {userLocation && sortBy === "nearby" && report.location?.geoPoint && (
+                      {userLocation && sortBy === "nearby" && report.geoPoint && (
                         <p className="text-xs text-blue-700">
                           Distance: {calculateDistance(
                             userLocation.latitude,
                             userLocation.longitude,
-                            report.location.geoPoint.latitude,
-                            report.location.geoPoint.longitude
+                            report.geoPoint!.latitude,
+                            report.geoPoint!.longitude
                           ).toFixed(2)} km away
                         </p>
                       )}

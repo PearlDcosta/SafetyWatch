@@ -25,7 +25,8 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Search, Filter, Archive, AlertCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Search, Filter, Archive, AlertCircle, Eye } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const StatusBadge = ({ status }: { status: CrimeReport["status"] }) => {
   const statusClasses = {
@@ -37,8 +38,10 @@ const StatusBadge = ({ status }: { status: CrimeReport["status"] }) => {
   };
 
   return (
-    <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusClasses[status]}`}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+    <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusClasses[status as keyof typeof statusClasses] || ""}`}>
+      {typeof status === "string" && status.length > 0
+        ? status.charAt(0).toUpperCase() + status.slice(1)
+        : "-"}
     </span>
   );
 };
@@ -99,8 +102,9 @@ export default function AdminDashboardPage() {
       let comparison = 0;
       switch (sortField) {
         case "date": {
-          const aDate = a.incidentDateTime ? new Date(a.incidentDateTime) : new Date(a.createdAt);
-          const bDate = b.incidentDateTime ? new Date(b.incidentDateTime) : new Date(b.createdAt);
+          // Only use incidentDateTime for sorting (non-nullable, always set)
+          const aDate = new Date(a.incidentDateTime ?? 0);
+          const bDate = new Date(b.incidentDateTime ?? 0);
           comparison = aDate.getTime() - bDate.getTime();
           break;
         }
@@ -117,7 +121,10 @@ export default function AdminDashboardPage() {
     setFilteredReports(sorted);
   }, [reports, searchQuery, sortField, sortDirection]);
 
-  const handleStatusChange = async (reportId: string, newStatus: CrimeReport["status"]) => {
+  const handleStatusChange = async (
+    reportId: string,
+    newStatus: "pending" | "reviewing" | "verified" | "resolved" | "rejected"
+  ) => {
     try {
       await updateCrimeReportStatus(reportId, newStatus);
       setReports(prevReports =>
@@ -152,6 +159,10 @@ export default function AdminDashboardPage() {
     }));
   };
 
+  const handleViewDetails = (reportId: string) => {
+    router.push(`/reports/${reportId}`);
+  };
+
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return <ChevronDown className="ml-1 h-4 w-4 opacity-50" />;
     return sortDirection === "asc" 
@@ -171,13 +182,47 @@ export default function AdminDashboardPage() {
   const activeReports = filteredByType.filter(r => r.status !== 'rejected' && r.status !== 'resolved');
   const archivedReports = filteredByType.filter(r => r.status === 'rejected' || r.status === 'resolved');
 
+  // Helper to format date as dd/mm/yyyy and time as hh:mm
+  function formatDateTimeGB(date: Date) {
+    return `${date.toLocaleDateString("en-GB")} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+  }
+
   if (loading || isLoadingReports) {
     return (
       <>
         <MainNav />
         <div className="flex justify-center items-center h-screen">
-          <div className="animate-pulse flex space-x-4">
-            <div className="rounded-full bg-gray-200 h-12 w-12"></div>
+          <div className="w-full max-w-4xl mx-auto px-4 py-8">
+            {/* Skeleton for header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+              <div>
+                <Skeleton className="h-8 w-48 mb-2" />
+                <Skeleton className="h-4 w-64" />
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Skeleton className="h-10 w-56" />
+                <Skeleton className="h-10 w-40" />
+              </div>
+            </div>
+            {/* Skeleton for table */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="bg-gray-50">
+                <div className="flex">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <Skeleton key={i} className="h-6 w-24 m-2" />
+                  ))}
+                </div>
+              </div>
+              <div>
+                {Array.from({ length: 5 }).map((_, rowIdx) => (
+                  <div key={rowIdx} className="flex border-b last:border-b-0">
+                    {Array.from({ length: 8 }).map((_, colIdx) => (
+                      <Skeleton key={colIdx} className="h-8 w-24 m-2" />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </>
@@ -187,6 +232,9 @@ export default function AdminDashboardPage() {
   if (!isAdmin) {
     return null;
   }
+
+  // Create a motion-enabled TableRow
+  const MotionTableRow = motion(TableRow);
 
   return (
     <>
@@ -286,12 +334,13 @@ export default function AdminDashboardPage() {
                           <SortIcon field="status" />
                         </div>
                       </TableHead>
+                      <TableHead className="font-medium min-w-[80px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     <AnimatePresence>
                       {activeReports.map((report) => (
-                        <motion.tr
+                        <MotionTableRow
                           key={report.id}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -312,11 +361,11 @@ export default function AdminDashboardPage() {
                             className={`max-w-[260px] ${expandedLocations[report.id] ? 'whitespace-normal' : 'truncate'} cursor-pointer`}
                             onClick={() => toggleLocationExpansion(report.id)}
                           >
-                            {report.location?.address || 'N/A'}
+                            {report.location || 'N/A'}
                           </TableCell>
                           <TableCell className="font-mono text-sm cursor-pointer truncate min-w-[110px] max-w-[130px]" onClick={() => toggleLocationExpansion(report.id + '-tracking')}>
                             <span className={expandedLocations[report.id + '-tracking'] ? 'whitespace-normal break-all' : ''}>
-                              {report.trackingId || report.id}
+                              {report.trackingId}
                             </span>
                           </TableCell>
                           {reportFilter === 'authenticated' && (
@@ -327,31 +376,20 @@ export default function AdminDashboardPage() {
                             </TableCell>
                           )}
                           <TableCell>
-                            {/* Use incidentDateTime if valid, else date/time if valid, else createdAt */}
+                            {/* Only use incidentDateTime for display */}
                             {(() => {
-                              let dateStr: string | undefined;
-                              let timeStr: string | undefined;
                               if (report.incidentDateTime && !isNaN(new Date(report.incidentDateTime).getTime())) {
                                 const d = new Date(report.incidentDateTime);
-                                dateStr = d.toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' });
-                                timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                              } else if (report.date && !isNaN(new Date(report.date).getTime())) {
-                                const d = new Date(report.date);
-                                dateStr = d.toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' });
-                                timeStr = report.time;
-                              } else if (report.createdAt && !isNaN(new Date(report.createdAt).getTime())) {
-                                const d = new Date(report.createdAt);
-                                dateStr = d.toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' });
-                                timeStr = undefined;
+                                return formatDateTimeGB(d);
                               }
-                              return dateStr ? `${dateStr}${timeStr ? ` at ${timeStr}` : ''}` : <span className="text-gray-400">-</span>;
+                              return <span className="text-gray-400">-</span>;
                             })()}
                           </TableCell>
                           <TableCell>
                             <Select 
                               value={report.status} 
                               onValueChange={(newStatus: CrimeReport["status"]) => 
-                                handleStatusChange(report.id, newStatus)
+                                handleStatusChange(report.id, newStatus as "pending" | "reviewing" | "verified" | "resolved" | "rejected")
                               }
                             >
                               <SelectTrigger className="w-[140px] border-none bg-transparent group-hover:bg-gray-100 transition-colors">
@@ -384,16 +422,15 @@ export default function AdminDashboardPage() {
                             </Select>
                           </TableCell>
                           <TableCell>
-                            <button
+                            <div 
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-md text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors cursor-pointer"
+                              onClick={() => handleViewDetails(report.id)}
                               title="View Details"
-                              onClick={() => router.push(`/reports/${report.id}`)}
-                              className="text-blue-600 hover:text-blue-800 transition-colors"
-                              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            </button>
+                              <Eye className="h-4 w-4" />
+                            </div>
                           </TableCell>
-                        </motion.tr>
+                        </MotionTableRow>
                       ))}
                     </AnimatePresence>
                   </TableBody>
@@ -405,14 +442,14 @@ export default function AdminDashboardPage() {
           {/* Archived Reports Section */}
           {archivedReports.length > 0 && (
             <div className="space-y-4">
-              <button
-                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+              <div
+                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
                 onClick={() => setShowArchived(!showArchived)}
               >
                 <Archive className="h-4 w-4" />
                 {showArchived ? "Hide" : "Show"} Archived Reports ({archivedReports.length})
                 <ChevronDown className={`h-4 w-4 transition-transform ${showArchived ? "rotate-180" : ""}`} />
-              </button>
+              </div>
 
               <AnimatePresence>
                 {showArchived && (
@@ -433,11 +470,12 @@ export default function AdminDashboardPage() {
                           {reportFilter === 'authenticated' && <TableHead className="font-medium min-w-[180px]">Reporter Email</TableHead>}
                           <TableHead className="font-medium min-w-[150px]">Date and Time Occurred</TableHead>
                           <TableHead className="font-medium min-w-[140px]">Status</TableHead>
+                          <TableHead className="font-medium min-w-[80px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {archivedReports.map((report) => (
-                          <motion.tr
+                          <MotionTableRow
                             key={report.id}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -452,16 +490,16 @@ export default function AdminDashboardPage() {
                               onClick={() => toggleLocationExpansion(report.id + '-title')}
                             >
                               {report.title}
-                            </TableCell>
+                            </TableCell>                          
                             <TableCell 
                               className={`max-w-[260px] ${expandedLocations[report.id] ? 'whitespace-normal' : 'truncate'} cursor-pointer`}
                               onClick={() => toggleLocationExpansion(report.id)}
                             >
-                              {report.location?.address || 'N/A'}
+                              {report.location || 'N/A'}
                             </TableCell>
                             <TableCell className="font-mono text-sm cursor-pointer truncate max-w-[180px]" onClick={() => toggleLocationExpansion(report.id + '-tracking')}>
                               <span className={expandedLocations[report.id + '-tracking'] ? 'whitespace-normal break-all' : ''}>
-                                {report.trackingId || report.id}
+                                {report.trackingId}
                               </span>
                             </TableCell>
                             {reportFilter === 'authenticated' && (
@@ -472,30 +510,33 @@ export default function AdminDashboardPage() {
                               </TableCell>
                             )}
                             <TableCell>
-                              {/* Show incidentDateTime if valid, else date if valid, else createdAt, else dash */}
+                              {/* Only use incidentDateTime for display */}
                               {(() => {
-                                const dateStr = report.incidentDateTime && !isNaN(new Date(report.incidentDateTime).getTime())
-                                  ? report.incidentDateTime
-                                  : report.date && !isNaN(new Date(report.date).getTime())
-                                    ? report.date
-                                    : report.createdAt && !isNaN(new Date(report.createdAt).getTime())
-                                      ? report.createdAt
-                                      : null;
-                                return dateStr
-                                  ? new Date(dateStr).toLocaleString("en-US", {
-                                      year: 'numeric',
-                                      month: 'short',
-                                      day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })
-                                  : <span className="text-gray-400">-</span>;
+                                if (report.incidentDateTime && !isNaN(new Date(report.incidentDateTime).getTime())) {
+                                  return new Date(report.incidentDateTime).toLocaleString("en-US", {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  });
+                                }
+                                return <span className="text-gray-400">-</span>;
                               })()}
                             </TableCell>
                             <TableCell>
                               <StatusBadge status={report.status} />
                             </TableCell>
-                          </motion.tr>
+                            <TableCell>
+                              <div 
+                                className="inline-flex items-center justify-center w-8 h-8 rounded-md text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors cursor-pointer"
+                                onClick={() => handleViewDetails(report.id)}
+                                title="View Details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </div>
+                            </TableCell>
+                          </MotionTableRow>
                         ))}
                       </TableBody>
                     </Table>

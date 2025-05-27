@@ -214,6 +214,11 @@ export default function RegisterForm({ onSuccess }: RegisterFormProps) {
           variant="outline"
           className="w-full"
           onClick={handleGoogleSignIn}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !isLoading && !isGoogleLoading) {
+              handleGoogleSignIn();
+            }
+          }}
           disabled={isLoading || isGoogleLoading}
         >
           {isGoogleLoading ? (

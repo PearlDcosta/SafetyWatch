@@ -9,7 +9,7 @@ import "leaflet.markercluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { CrimeReport } from "@/types";
-import { format } from "date-fns";
+import { formatReportDateTime } from "@/lib/utils";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -71,11 +71,13 @@ function HeatmapLayer({ reports }: { reports: CrimeReport[] }) {
   useEffect(() => {
     // @ts-ignore
     const heatLayer = L.heatLayer(
-      reports.map(r => [
-        r.location.geoPoint.latitude,
-        r.location.geoPoint.longitude,
-        1
-      ]),
+      reports
+        .filter(r => r.geoPoint)
+        .map(r => [
+          r.geoPoint!.latitude,
+          r.geoPoint!.longitude,
+          1
+        ]),
       {
         radius: 40,
         blur: 30,
@@ -118,10 +120,9 @@ function ClusterLayer({
       iconCreateFunction: createClusterCustomIcon,
     });
 
-    reports.forEach((report) => {
-      const incidentDate = getIncidentDate(report);
+    reports.filter(report => report.geoPoint).forEach((report) => {
       const marker = L.marker(
-        [report.location.geoPoint.latitude, report.location.geoPoint.longitude],
+        [report.geoPoint!.latitude, report.geoPoint!.longitude],
         { icon: createMapIcon(getIconColor(report.crimeType), markerSize) }
       ).bindPopup(`
         <div class="max-w-[250px] space-y-1">
@@ -129,7 +130,7 @@ function ClusterLayer({
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
             <span class="font-medium capitalize">${report.crimeType.toLowerCase()}</span>
             <span>•</span>
-            <span>${incidentDate ? format(incidentDate, "MMM d, yyyy") : "-"}</span>
+            <span>${formatReportDateTime(report).combined}</span>
           </div>
           <p class="text-sm line-clamp-2 my-2">${report.description}</p>
           <a href="/reports/${report.id}" class="text-primary hover:underline text-sm font-medium">
@@ -153,10 +154,6 @@ function ClusterLayer({
 function getIncidentDate(report: CrimeReport): Date | null {
   if (report.incidentDateTime && !isNaN(new Date(report.incidentDateTime).getTime())) {
     return new Date(report.incidentDateTime);
-  } else if (report.date && !isNaN(new Date(report.date).getTime())) {
-    return new Date(report.date);
-  } else if (report.createdAt && !isNaN(new Date(report.createdAt).getTime())) {
-    return new Date(report.createdAt);
   }
   return null;
 }
@@ -198,10 +195,11 @@ export default function CrimeMap({ reports, isLoading }: CrimeMapProps) {
 
   const center = useMemo(() => {
     if (userLocation) return userLocation;
-    if (filteredReports.length > 0) {
+    const reportsWithGeoPoint = filteredReports.filter(r => r.geoPoint);
+    if (reportsWithGeoPoint.length > 0) {
       return [
-        filteredReports[0].location.geoPoint.latitude,
-        filteredReports[0].location.geoPoint.longitude,
+        reportsWithGeoPoint[0].geoPoint!.latitude,
+        reportsWithGeoPoint[0].geoPoint!.longitude,
       ] as [number, number];
     }
     return INDIA_CENTER;
@@ -388,14 +386,13 @@ export default function CrimeMap({ reports, isLoading }: CrimeMapProps) {
           />
         )}
 
-        {!showHeatmap && !showClusters && filteredReports.map((report) => {
-          const incidentDate = getIncidentDate(report);
+        {!showHeatmap && !showClusters && filteredReports.filter(report => report.geoPoint).map((report) => {
           return (
             <Marker
               key={report.id}
               position={[
-                report.location.geoPoint.latitude,
-                report.location.geoPoint.longitude,
+                report.geoPoint!.latitude,
+                report.geoPoint!.longitude,
               ]}
               icon={createMapIcon(getIconColor(report.crimeType), markerSize)}
             >
@@ -405,7 +402,7 @@ export default function CrimeMap({ reports, isLoading }: CrimeMapProps) {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <span className="font-medium capitalize">{report.crimeType.toLowerCase()}</span>
                     <span>•</span>
-                    <span>{incidentDate ? format(incidentDate, "MMM d, yyyy") : "-"}</span>
+                    <span>{formatReportDateTime(report).combined}</span>
                   </div>
                   <p className="text-sm line-clamp-2 my-2">{report.description}</p>
                   <Link

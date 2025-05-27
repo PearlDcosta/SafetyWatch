@@ -7,24 +7,15 @@ import {
   useEffect,
   ReactNode,
 } from "react";
-import {
-  User,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  updateProfile,
-  GoogleAuthProvider, // Added
-  signInWithPopup, // Added
-} from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 
 type UserRole = "admin" | "user";
 
-interface AuthUser extends User {
+interface AuthUser {
+  uid: string;
+  email: string;
+  displayName?: string;
   role?: UserRole;
 }
 
@@ -36,18 +27,32 @@ interface AuthContextType {
     password: string,
     name: string,
     isAdminRegister?: boolean
-  ) => Promise<void>; // Added isAdminRegister
+  ) => Promise<void>; 
   login: (
     email: string,
     password: string,
     isAdminLogin?: boolean
-  ) => Promise<void>; // Added isAdminLogin
+  ) => Promise<void>; 
   logout: () => Promise<void>;
-  signInWithGoogle: (isAdminRegister?: boolean) => Promise<void>; // Added isAdminRegister
+  signInWithGoogle: (isAdminRegister?: boolean) => Promise<void>; 
   isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Google Identity Services script
+function loadGoogleScript() {
+  return new Promise<void>((resolve) => {
+    if (document.getElementById('google-oauth')) return resolve();
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.id = 'google-oauth';
+    script.onload = () => resolve();
+    document.head.appendChild(script);
+  });
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -57,105 +62,133 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Optionally fetch user role from Firestore
-        const userRef = doc(db, "users", firebaseUser.uid);
-        const userSnap = await getDoc(userRef);
-        const role = userSnap.exists() ? userSnap.data().role : undefined;
-        setUser({ ...firebaseUser, role });
-        setIsAdmin(role === "admin"); // <-- set isAdmin here
-      } else {
+    const fetchUser = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+          setIsAdmin(data.user?.role === "admin");
+        } else {
+          setUser(null);
+          setIsAdmin(false);
+        }
+      } catch {
         setUser(null);
-        setIsAdmin(false); // <-- reset isAdmin
+        setIsAdmin(false);
       }
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    fetchUser();
   }, []);
 
+  // Register via API
   const register = async (
     email: string,
     password: string,
     name: string,
     isAdminRegister?: boolean
   ) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-    await updateProfile(user, { displayName: name });
-    // Save user role in Firestore
-    await setDoc(doc(db, "users", user.uid), {
-      name,
-      email,
-      role: isAdminRegister ? "admin" : "user",
-      createdAt: new Date(),
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, name, role: isAdminRegister ? "admin" : "user" }),
     });
-    // No need to manually sign in, Firebase does this automatically
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.message || "Registration failed");
+    }
+    // Optionally, fetch user again
+    await new Promise((r) => setTimeout(r, 300));
+    const me = await fetch("/api/auth/me");
+    if (me.ok) {
+      const data = await me.json();
+      setUser(data.user);
+      setIsAdmin(data.user?.role === "admin");
+    }
   };
 
+  // Login via API
   const login = async (
     email: string,
     password: string,
     isAdminLogin?: boolean
   ) => {
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // Additional check for admin login
-      if (isAdminLogin) {
-        const userRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userRef);
-
-        if (!userSnap.exists() || userSnap.data()?.role !== 'admin') {
-          await signOut(auth);
-          // Throw a Firebase-like error object for consistency
-          const error: any = new Error('Not authorized as admin');
-          error.code = 'auth/not-authorized';
-          throw error;
-        }
-      }
-    } catch (error) {
-      console.error("Error during login:", error);
-      throw error; // Make sure to re-throw the error
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, isAdminLogin }),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.message || "Login failed");
+    }
+    // Optionally, fetch user again
+    await new Promise((r) => setTimeout(r, 300));
+    const me = await fetch("/api/auth/me");
+    if (me.ok) {
+      const data = await me.json();
+      setUser(data.user);
+      setIsAdmin(data.user?.role === "admin");
     }
   };
 
-  const signInWithGoogle = async (isAdminRegister?: boolean) => {
+  // Google sign-in via API
+  const signInWithGoogle = async (isAdminRegister?: boolean): Promise<void> => {
     try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        await setDoc(doc(db, "users", user.uid), {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          role: isAdminRegister ? "admin" : "user",
-          createdAt: new Date().toISOString(),
+      await loadGoogleScript();
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      if (!(window as any).google || !clientId) throw new Error('Google SDK not loaded');
+      const google = (window as any).google;
+      return new Promise<void>((resolve, reject) => {
+        const codeClient = google.accounts.oauth2.initCodeClient({
+          client_id: clientId,
+          scope: 'openid email profile',
+          callback: async (response: any) => {
+            if (!response || !response.code) {
+              reject(new Error('Google authentication failed'));
+              return;
+            }
+            // Send the code to the backend for token exchange
+            const res = await fetch('/api/auth/google', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                code: response.code,
+                isAdminRegister,
+              }),
+            });
+            if (!res.ok) {
+              const error = await res.json();
+              reject(new Error(error.message || 'Google sign-in failed'));
+              return;
+            }
+            // Refresh user data
+            await new Promise((r) => setTimeout(r, 300));
+            const me = await fetch('/api/auth/me');
+            if (me.ok) {
+              const data = await me.json();
+              setUser(data.user);
+              setIsAdmin(data.user?.role === 'admin');
+            }
+            resolve();
+          },
         });
-      } else if (isAdminRegister && userSnap.data().role !== "admin") {
-        await setDoc(userRef, { role: "admin" }, { merge: true });
-      }
+        codeClient.requestCode(); // This opens the popup
+      });
     } catch (error: any) {
-      if (error.code === "auth/popup-closed-by-user") {
-        toast.error("Google sign-in was cancelled.");
-        return;
-      }
-      console.error("Error during Google sign-in:", error);
+      toast.error(error.message || 'Google sign-in failed');
       throw error;
     }
   };
 
+  // Logout via API
   const logout = async () => {
     try {
-      if (auth.currentUser) {
-        await signOut(auth);
-      }
+      await fetch("/api/auth/logout", { method: "POST" });
+      setUser(null);
+      setIsAdmin(false);
       router.push("/");
     } catch (error) {
       console.error("Error during logout:", error);

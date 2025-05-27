@@ -2,6 +2,7 @@
 import { MainNav } from "@/components/main-nav";
 import { ReportCrimeForm } from "@/components/report-crime-form";
 import { useAuth } from "@/context/auth-context";
+import { formatReportDateTime } from "@/lib/utils";
 
 export default function ReportCrimePage() {
   const { user } = useAuth();

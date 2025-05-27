@@ -9,10 +9,10 @@ import { useEffect, useState } from "react";
 
 export function MainNav() {
   const pathname = usePathname();
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, logout, loading } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const router = useRouter(); // <-- Add this line
+  const router = useRouter(); 
 
   useEffect(() => {
     const handleScroll = () => {
@@ -22,9 +22,29 @@ export function MainNav() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  useEffect(() => {
+    // Prefetch most important pages for fast navigation
+    router.prefetch("/crimes");
+    router.prefetch("/reports");
+    router.prefetch("/reports/map");
+    if (user && user.role === "admin") {
+      router.prefetch("/admin/dashboard");
+    } else if (user && (!user.role || user.role === "user")) {
+      router.prefetch("/dashboard");
+    }
+  }, [router, user]);
+
   // Role-based navigation items
   let navItems = [];
-  if (user && user.role === "admin") {
+  if (loading) {
+    // Show basic items while loading
+    navItems = [
+      { href: "/reports/new", label: "Report Crime" },
+      { href: "/crimes", label: "Crime Reports" },
+      { href: "/reports/map", label: "Crime Map" },
+      { href: "/stats", label: "Statistics" },
+    ];
+  } else if (user && user.role === "admin") {
     navItems = [
       { href: "/crimes", label: "Crime Reports" },
       { href: "/reports/map", label: "Crime Map" },
@@ -110,10 +130,23 @@ export function MainNav() {
 
         {/* Right: Auth/User actions (visible on screens 1200px and above) */}
         <div className="hidden min-[1200px]:flex items-center">
-          {user ? (
+          {loading ? (
+            <div className="flex items-center space-x-4">
+              <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+              <Button
+                disabled
+                variant="outline"
+                className="h-10 px-5 text-lg font-semibold border-gray-300 text-gray-400"
+              >
+                Loading...
+              </Button>
+            </div>
+          ) : user ? (
             <div className="flex items-center space-x-4">
               <span className="text-lg font-medium text-gray-900">
-                {user.displayName || user.email}
+                {user.displayName && user.displayName.trim() !== ""
+                  ? user.displayName
+                  : user.email.split("@")[0]}
               </span>
               <Button
                 onClick={async () => {
@@ -208,10 +241,23 @@ export function MainNav() {
                 ))}
                 {/* Increased padding above user section */}
                 <li className="pt-6">
-                  {user ? (
+                  {loading ? (
+                    <div className="flex flex-col space-y-2 pt-2">
+                      <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+                      <Button
+                        disabled
+                        variant="outline"
+                        className="h-10 w-full text-lg font-semibold border-gray-300 text-gray-400"
+                      >
+                        Loading...
+                      </Button>
+                    </div>
+                  ) : user ? (
                     <div className="flex flex-col space-y-2 pt-2">
                       <span className="text-lg font-medium text-gray-900">
-                        {user.displayName || user.email}
+                        {user.displayName && user.displayName.trim() !== ""
+                          ? user.displayName
+                          : user.email.split("@")[0]}
                       </span>
                       <Button
                         onClick={async () => {
